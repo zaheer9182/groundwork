@@ -1,0 +1,25 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "PYTHON_ENABLE_INIT_INDEXING": "1",
+
+    "GW_DEV_MODE": "1",
+    "GW_SOURCE": "local",
+    "GW_LOCAL_ROOT": "evals/corpus",
+
+    "GW_TENANT_ID": "",
+    "GW_API_CLIENT_ID": "",
+    "GW_API_CLIENT_SECRET": "",
+    "GW_SEARCH_SCOPE": "",
+
+    "GW_PROVIDER": "anthropic",
+    "GW_MODEL": "claude-sonnet-5-5",
+    "ANTHROPIC_API_KEY": "",
+    "AZURE_OPENAI_ENDPOINT": "",
+
+    "GW_ASSISTANT_NAME": "the company knowledge assistant"
+  },
+  "Host": { "CORS": "http://localhost:5173" }
+}

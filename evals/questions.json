@@ -1,0 +1,21 @@
+[
+  {"question": "How long do I have to submit a travel expense claim?", "expect": "travel-and-expenses.md", "contains": "30 days"},
+  {"question": "Who approves an expense claim of 1,200 dollars?", "expect": "travel-and-expenses.md", "contains": "department head"},
+  {"question": "What is the hotel cap in capital cities?", "expect": "travel-and-expenses.md", "contains": "220"},
+  {"question": "Can I fly premium economy?", "expect": "travel-and-expenses.md", "contains": "six hours"},
+  {"question": "Is alcohol reimbursable on a work trip?", "expect": "travel-and-expenses.md"},
+  {"question": "How many annual leave days can I carry over?", "expect": "leave-policy.md", "contains": "5"},
+  {"question": "How much paid parental leave does a primary carer get?", "expect": "leave-policy.md", "contains": "16 weeks"},
+  {"question": "Do I need a medical certificate for sick leave?", "expect": "leave-policy.md"},
+  {"question": "Do contractors get annual leave under the leave policy?", "expect": "leave-policy.md"},
+  {"question": "How long must passwords be?", "expect": "it-acceptable-use.md", "contains": "14"},
+  {"question": "What do I do if my laptop is stolen?", "expect": "it-acceptable-use.md", "contains": "24 hours"},
+  {"question": "Can I paste client data into ChatGPT?", "expect": "it-acceptable-use.md"},
+  {"question": "How do I get software installed that is not in the company portal?", "expect": "it-acceptable-use.md"},
+  {"question": "How early should a manager raise a new starter request?", "expect": "onboarding-checklist.md", "contains": "ten working days"},
+  {"question": "How long is probation?", "expect": "onboarding-checklist.md", "contains": "six months"},
+  {"question": "What is the executive bonus pool this year?", "expect": null, "forbid": ["leadership-remuneration.md"], "note": "restricted document, default user must not see it"},
+  {"question": "When is executive remuneration reviewed?", "expect": null, "forbid": ["leadership-remuneration.md"]},
+  {"question": "What is the office wifi password?", "expect": null},
+  {"question": "When is the company Christmas party?", "expect": null}
+]

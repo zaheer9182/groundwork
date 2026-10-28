@@ -1,0 +1,48 @@
+name: deploy
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  id-token: write     # OIDC federated credential, no stored Azure secret or publish profile
+  contents: read
+
+jobs:
+  staging:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.FUNCTION_APP_NAME }}
+          package: .
+          remote-build: true          # Linux wheels (cryptography) built on Azure
+      - name: Health check
+        run: curl --fail --retry 6 --retry-delay 10 --retry-all-errors "https://${{ vars.FUNCTION_APP_HOST }}/api/health"
+
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    environment: production            # required reviewers set in repo settings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ vars.FUNCTION_APP_NAME }}
+          package: .
+          remote-build: true
+      - name: Health check
+        run: curl --fail --retry 6 --retry-delay 10 --retry-all-errors "https://${{ vars.FUNCTION_APP_HOST }}/api/health"

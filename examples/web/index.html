@@ -1,0 +1,126 @@
+<!doctype html>
+<!--
+  Minimal client for Groundwork. Not a product UI: it shows the three things
+  any client has to get right.
+    1. Get a token for the API scope with MSAL (or skip it against a dev-mode backend).
+    2. Read the event stream with fetch, since EventSource cannot POST or send headers.
+    3. Render citations from the `citations` event, not from the model's text.
+  Serve it with:  python -m http.server 5173  (from this folder)
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Groundwork</title>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"></script>
+<style>
+  :root { --bg:#fafaf9; --fg:#1c1917; --muted:#78716c; --line:#e7e5e4; --accent:#0f766e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#1c1917; --fg:#f5f5f4; --muted:#a8a29e; --line:#44403c; --accent:#5eead4; } }
+  body { margin:0; font:16px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--fg); }
+  main { max-width:720px; margin:0 auto; padding:24px 16px; }
+  form { display:flex; gap:8px; }
+  input { flex:1; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:transparent; color:inherit; font:inherit; }
+  button { padding:10px 16px; border:0; border-radius:8px; background:var(--accent); color:var(--bg); font:inherit; cursor:pointer; }
+  .turn { border-top:1px solid var(--line); padding:16px 0; }
+  .q { font-weight:600; } .stage { color:var(--muted); font-size:14px; }
+  .a { white-space:pre-wrap; } ol { color:var(--muted); font-size:14px; padding-left:20px; }
+  a { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Ask the policies</h1>
+  <form id="f"><input id="q" placeholder="How long do I have to submit an expense claim?" autocomplete="off"><button>Ask</button></form>
+  <div id="log"></div>
+</main>
+<script>
+const CONFIG = {
+  api: "http://localhost:7071/api",
+  devMode: true,                    // backend running with GW_DEV_MODE=1, no sign-in
+  clientId: "<spa-client-id>",
+  tenantId: "<tenant-id>",
+  apiScope: "api://<api-client-id>/access_as_user",
+};
+
+let msal, account;
+const history = [];
+
+async function token() {
+  if (CONFIG.devMode) return null;
+  if (!msal) {
+    msal = new msalBrowser.PublicClientApplication({
+      auth: { clientId: CONFIG.clientId, authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`, redirectUri: location.origin },
+    });
+    await msal.initialize();
+    account = msal.getAllAccounts()[0] || (await msal.loginPopup({ scopes: [CONFIG.apiScope] })).account;
+  }
+  try {
+    return (await msal.acquireTokenSilent({ scopes: [CONFIG.apiScope], account })).accessToken;
+  } catch {
+    return (await msal.acquireTokenPopup({ scopes: [CONFIG.apiScope], account })).accessToken;
+  }
+}
+
+async function* events(res) {
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) return;
+    buf += value;
+    let i;
+    while ((i = buf.indexOf("\n\n")) !== -1) {
+      const block = buf.slice(0, i); buf = buf.slice(i + 2);
+      const name = block.match(/^event: (.*)$/m)?.[1];
+      const data = block.match(/^data: (.*)$/m)?.[1];
+      if (name && data) yield [name, JSON.parse(data)];
+    }
+  }
+}
+
+async function ask(question, retried = false) {
+  const turn = document.createElement("div");
+  turn.className = "turn";
+  turn.innerHTML = `<div class="q"></div><div class="stage"></div><div class="a"></div><ol></ol>`;
+  turn.querySelector(".q").textContent = question;
+  document.getElementById("log").prepend(turn);
+  const [stage, answer, refs] = [".stage", ".a", "ol"].map(s => turn.querySelector(s));
+
+  const t = await token();
+  const res = await fetch(`${CONFIG.api}/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(t ? { Authorization: `Bearer ${t}` } : {}) },
+    body: JSON.stringify({ question, history }),
+  });
+  if (res.status === 401 && !retried && msal) {
+    // interaction_required from on-behalf-of: consent or MFA step-up, then retry once
+    await msal.acquireTokenPopup({ scopes: [CONFIG.apiScope], account });
+    turn.remove();
+    return ask(question, true);
+  }
+  if (!res.ok) { stage.textContent = `Error ${res.status}`; return; }
+
+  let text = "";
+  for await (const [name, data] of events(res)) {
+    if (name === "status") stage.textContent = { searching: "Searching…", reading: "Reading documents…", writing: "" }[data.stage];
+    if (name === "delta") { text += data.text; answer.textContent = text; }
+    if (name === "citations") for (const c of data) {
+      const li = document.createElement("li");
+      const a = Object.assign(document.createElement("a"), { href: c.url, target: "_blank", rel: "noopener", textContent: c.title });
+      li.value = c.id; li.append(a, c.section ? ` · ${c.section}` : "", c.page ? ` · p.${c.page}` : "");
+      refs.append(li);
+    }
+    if (name === "error") stage.textContent = data.code === "throttled" ? "Busy, try again shortly." : "Something went wrong.";
+    if (name === "done") stage.textContent = "";
+  }
+  history.push({ role: "user", content: question }, { role: "assistant", content: text });
+}
+
+document.getElementById("f").addEventListener("submit", e => {
+  e.preventDefault();
+  const q = document.getElementById("q");
+  if (q.value.trim()) { ask(q.value.trim()); q.value = ""; }
+});
+</script>
+</body>
+</html>
